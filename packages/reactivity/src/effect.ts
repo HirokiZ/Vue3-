@@ -1,5 +1,13 @@
 export let activeEffect = undefined;
 
+function clearupEffect(effect){
+    const {deps} = effect 
+    for(let i=0;i<deps.length;i++) {
+      deps[i].delete(effect)
+    }
+    effect.deps.length=0
+}
+
 class ReactiveEffect {
   //属性记录effect:在实例上新增了active属性
   public parent = null;
@@ -18,6 +26,11 @@ class ReactiveEffect {
     try {
       this.parent = activeEffect;
       activeEffect = this; //把activeEffect挂到实例上
+
+      //这里需要在执行用户函数之前收集的内容清空 
+      //activeEffect.deps=[ set(),set()] 一个是name对应的，一个是age对应的
+      clearupEffect(this)  //这个函数清理谁？ ReactiveEffect
+
       return this.fn(); //当稍后调用取值操作的时候，就可以获取到这个全集局的activeEffect
     } finally {
       activeEffect = this.parent;
@@ -71,8 +84,14 @@ export function trigger(target,type,key,value,oldValue){
   //去找一下对象
   const depsMap = targetMap.get(target)  //找的就是 Map{ name : set }
   if(!depsMap) return;
-  const effects = depsMap.get(key)       //找到属性对的effect,是一个集合里面有很多effect
-  effects && effects.forEach(effect => { //如果没有，空set也可以走forEach
-    if(effect !== activeEffect) effect.run()                         //重新走 ReactiveEffect 里面的逻辑
-  });
+  let effects = depsMap.get(key)       //找到属性对的effect,是一个集合里面有很多effect
+
+  //永远执行之前 先拷贝一份，不要关联引用
+  if(effects){
+    effects = new Set(effects)
+    effects.forEach(effect => { //如果没有，空set也可以走forEach
+      if(effect !== activeEffect) effect.run() //重新走 ReactiveEffect 里面的逻辑
+    });
+  }
+  
 }

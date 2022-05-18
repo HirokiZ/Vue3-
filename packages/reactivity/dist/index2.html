@@ -12,21 +12,23 @@
     <div id="app"></div>
     <script>
         const {effect,reactive} = VueReactivity;
-        const state=reactive({
+        const data={
             name:'zf',
             age:13,
-            flag:true
-        })
+            address:{
+                city:'chengdu'
+            }
+        }
+        const state=reactive(data)
+        //此effect会默认执行一次，对响应式数据取值  （取值的过程中会依赖于当前的effect）
         effect(()=>{
-            console.log('rander')
-            document.body.innerHTML=state.flag?state.name:state.age
+            // state.age=Math.random()
+            document.getElementById('app').innerHTML=state.name+'今年'+state.age+'岁了'
         })
+
+        //稍后的age变化会重新执行effect函数
         setTimeout(()=>{
-            state.flag=false
-            setTimeout(()=>{
-                console.log('修改name,原则上不更新')
-                state.name='wl'
-            },1000)
+            state.age++
         },1000)
     </script>
 </body>
