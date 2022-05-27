@@ -14,7 +14,7 @@ class ReactiveEffect {
   //effect记录依赖的属性
   public deps=[];
   public active = true;
-  constructor(public fn) {}
+  constructor(public fn,public scheduler) {}
   run() {
     //默认执行第一次,
     //非激活状态，只要执行函数，不需要进行依赖收集
@@ -37,13 +37,28 @@ class ReactiveEffect {
       this.parent = null;
     }
   }
+
+  stop(){
+    //怎么停，入过当前是激活的
+    if(this.active){
+      this.active=false
+      //数据变了依然会重新收集，那么停止effect收集
+      clearupEffect(this)
+    }
+  }
 }
 
-export function effect(fn) {
+export function effect(fn,options:any={}) {
   //可以根据状态变化重新执行，所以effect可以嵌套着写
-  const _effect = new ReactiveEffect(fn); //创建响应式的effect
-
+  //创建响应式的effect,把调度函数传给响应式
+  const _effect = new ReactiveEffect(fn,options.scheduler); 
   _effect.run(); //默认先执行一次
+
+  //绑定this指向
+  const runner=_effect.run.bind(_effect)
+  //讲effect函数挂载到runner上
+  runner.effect=_effect
+  return runner
 }
 
 //一个effectdui应多个属性，一个属性对应多了effect
@@ -51,7 +66,6 @@ export function effect(fn) {
 const targetMap = new WeakMap();
 export function track(target, type, key) {
   //目标，类型（标记），收集的那个属性
-  // debugger
   //模板中没有，直接返回
   if (!activeEffect) return;
   //先看一下有没有存放对象（第一次肯定是没有的）
@@ -90,7 +104,13 @@ export function trigger(target,type,key,value,oldValue){
   if(effects){
     effects = new Set(effects)
     effects.forEach(effect => { //如果没有，空set也可以走forEach
-      if(effect !== activeEffect) effect.run() //重新走 ReactiveEffect 里面的逻辑
+      if(effect !== activeEffect){
+        if(effect.scheduler){
+          effect.scheduler()
+        }else{
+          effect.run() //重新走 ReactiveEffect 里面的逻辑
+        }
+      } 
     });
   }
   

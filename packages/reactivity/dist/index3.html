@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+   
+</head>
+<body>
+    <script src="./reactivity.global.js"></script>
+    <div id="app"></div>
+    <script>
+        const {effect,reactive} = VueReactivity;
+        const state=reactive({
+            name:'zf',
+            age:13,
+            flag:true
+        })
+        //effect会返回一个运行runner
+        //强制effect重新渲染
+        let runner = effect(()=>{
+            document.body.innerHTML=state.age
+        })
+
+        //作用域effectScope()
+        //stop作用就是让effect作废
+        runner.effect.stop()
+        setTimeout(()=>{
+            state.age=1000
+            setTimeout(()=>{
+                runner()
+            },5000)
+        },1000)
+    </script>
+</body>
+</html>
