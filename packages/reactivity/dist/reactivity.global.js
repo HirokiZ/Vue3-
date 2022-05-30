@@ -20,6 +20,7 @@ var VueReactivity = (() => {
   // packages/reactivity/src/index.ts
   var src_exports = {};
   __export(src_exports, {
+    computed: () => computed,
     effect: () => effect,
     reactive: () => reactive
   });
@@ -48,8 +49,8 @@ var VueReactivity = (() => {
       try {
         this.parent = activeEffect;
         activeEffect = this;
-        clearupEffect(this);
         return this.fn();
+        clearupEffect(this);
       } finally {
         activeEffect = this.parent;
         this.parent = null;
@@ -81,10 +82,15 @@ var VueReactivity = (() => {
     if (!dep) {
       depsMap.set(key, dep = /* @__PURE__ */ new Set());
     }
-    let shouldTrack = !dep.has(activeEffect);
-    if (shouldTrack) {
-      dep.add(activeEffect);
-      activeEffect.deps.push(dep);
+    trackEffects(dep);
+  }
+  function trackEffects(dep) {
+    if (activeEffect) {
+      let shouldTrack = !dep.has(activeEffect);
+      if (shouldTrack) {
+        dep.add(activeEffect);
+        activeEffect.deps.push(dep);
+      }
     }
   }
   function trigger(target, type, key, value, oldValue) {
@@ -93,23 +99,30 @@ var VueReactivity = (() => {
       return;
     let effects = depsMap.get(key);
     if (effects) {
-      effects = new Set(effects);
-      effects.forEach((effect2) => {
-        if (effect2 !== activeEffect) {
-          if (effect2.scheduler) {
-            effect2.scheduler();
-          } else {
-            effect2.run();
-          }
-        }
-      });
+      triggerEffects(effects);
     }
+  }
+  function triggerEffects(effects) {
+    effects = new Set(effects);
+    effects.forEach((effect2) => {
+      if (effect2 !== activeEffect) {
+        if (effect2.scheduler) {
+          effect2.scheduler();
+        } else {
+          effect2.run();
+        }
+      }
+    });
   }
 
   // packages/shared/src/index.ts
   var isObject = (value) => {
     return typeof value === "object" && value !== null;
   };
+  var isFunction = (value) => {
+    return typeof value === "function";
+  };
+  var isArray = Array.isArray;
 
   // packages/reactivity/src/baseHandler.ts
   var mutableHandlers = {
@@ -118,7 +131,11 @@ var VueReactivity = (() => {
         return true;
       }
       track(target, "get", key);
-      return Reflect.get(target, key, receiver);
+      let res = Reflect.get(target, key, receiver);
+      if (isObject(res)) {
+        return reactive(res);
+      }
+      return res;
     },
     set(target, key, value, receiver) {
       let oldValue = target[key];
@@ -147,6 +164,48 @@ var VueReactivity = (() => {
     reactiveMap.set(target, proxy);
     return proxy;
   }
+
+  // packages/reactivity/src/computed.ts
+  var ComputedRefImpl = class {
+    constructor(getter, setter) {
+      this.setter = setter;
+      this._dirty = true;
+      this._v_isReadonly = true;
+      this._v_isRef = true;
+      this.effect = new ReactiveEffect(getter, () => {
+        if (!this._dirty) {
+          this._dirty = true;
+          triggerEffects(this.dep);
+        }
+      });
+    }
+    get value() {
+      trackEffects(this.dep || (this.dep = /* @__PURE__ */ new Set()));
+      if (this._dirty) {
+        this._dirty = false;
+        this._value = this.effect.run();
+      }
+      return this._value;
+    }
+    set value(newValue) {
+      this.setter(newValue);
+    }
+  };
+  var computed = (getterOrOptions) => {
+    let onlyGutter = isFunction(getterOrOptions);
+    let getter;
+    let setter;
+    if (onlyGutter) {
+      getter = getterOrOptions;
+      setter = () => {
+        console.warn("no set");
+      };
+    } else {
+      getter = getterOrOptions.get;
+      setter = getterOrOptions.set;
+    }
+    return new ComputedRefImpl(getter, setter);
+  };
   return __toCommonJS(src_exports);
 })();
 //# sourceMappingURL=reactivity.global.js.map

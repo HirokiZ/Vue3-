@@ -8,7 +8,7 @@ function clearupEffect(effect){
     effect.deps.length=0
 }
 
-class ReactiveEffect {
+export class ReactiveEffect {
   //属性记录effect:在实例上新增了active属性
   public parent = null;
   //effect记录依赖的属性
@@ -26,12 +26,12 @@ class ReactiveEffect {
     try {
       this.parent = activeEffect;
       activeEffect = this; //把activeEffect挂到实例上
-
+      return this.fn(); //当稍后调用取值操作的时候，就可以获取到这个全集局的activeEffect
       //这里需要在执行用户函数之前收集的内容清空 
       //activeEffect.deps=[ set(),set()] 一个是name对应的，一个是age对应的
       clearupEffect(this)  //这个函数清理谁？ ReactiveEffect
 
-      return this.fn(); //当稍后调用取值操作的时候，就可以获取到这个全集局的activeEffect
+      
     } finally {
       activeEffect = this.parent;
       this.parent = null;
@@ -81,7 +81,11 @@ export function track(target, type, key) {
   if (!dep) {
     depsMap.set(key, (dep = new Set()));
   }
-  //如果在effect中多次,使用了数据，比如state.name,state.name
+  trackEffects(dep)
+}
+export function trackEffects(dep){
+  if(activeEffect){
+    //如果在effect中多次,使用了数据，比如state.name,state.name
   let shouldTrack = !dep.has(activeEffect); //去重
   if (shouldTrack) {
     //没有，就添加属性activeEffect
@@ -90,6 +94,8 @@ export function track(target, type, key) {
     //记录effect被哪些属性收集过,存的是对应的set
     activeEffect.deps.push(dep)
   }
+  }
+  
 }
 
 //触发更新
@@ -102,16 +108,20 @@ export function trigger(target,type,key,value,oldValue){
 
   //永远执行之前 先拷贝一份，不要关联引用
   if(effects){
-    effects = new Set(effects)
-    effects.forEach(effect => { //如果没有，空set也可以走forEach
-      if(effect !== activeEffect){
-        if(effect.scheduler){
-          effect.scheduler()
-        }else{
-          effect.run() //重新走 ReactiveEffect 里面的逻辑
-        }
-      } 
-    });
+    triggerEffects(effects)
   }
   
+}
+
+export function triggerEffects(effects){
+  effects = new Set(effects)
+  effects.forEach(effect => { //如果没有，空set也可以走forEach
+    if(effect !== activeEffect){
+      if(effect.scheduler){
+        effect.scheduler()
+      }else{
+        effect.run() //重新走 ReactiveEffect 里面的逻辑
+      }
+    } 
+  });
 }

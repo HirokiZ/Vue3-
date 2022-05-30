@@ -16,7 +16,10 @@
         const state=reactive({
             name:'zf',
             age:13,
-            flag:true
+            flag:true,
+            address:{
+                number:1
+            }
         })
         //effect会返回一个运行runner
         //强制effect重新渲染
@@ -41,6 +44,7 @@
     state.age=20
     state.age=21
     
+    console.log('对象套对象，我就在reactive里处理一下',state.address)
     </script>
 </body>
 </html>
