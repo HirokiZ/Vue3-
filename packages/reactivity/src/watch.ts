@@ -32,10 +32,17 @@ export function watch(source, cb) {
   } else {
     return;
   }
+  let cleanup;
+  const onCleanup = (fn) =>{
+    cleanup=fn
+  }
+
   let oldValue;
   const job = () => {
+    //下一次watch开始触发上一次watch的清理
+    if(cleanup)cleanup() 
     const newValue = effect.run();
-    cb(newValue, oldValue);
+    cb(newValue, oldValue,onCleanup);
     oldValue = newValue;
   };
   //在effect中访问属性就可以依赖收集
